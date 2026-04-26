@@ -1,0 +1,13 @@
+env/
+venv/
+.env/
+.venv/
+__pycache__/
+files-/
+*.pdf
+*.log
+*.json
+
+!results/**/*.pdf
+!results/**/*.json
+!results/**/*.log
