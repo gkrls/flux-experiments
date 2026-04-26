@@ -1,16 +1,12 @@
-# Data Plane AllReduce Experiments
+# Flux Experiments
 
 ## Local setup
 ```bash
 sudo apt install pssh
 
-# with (local) python
 python -m venv env
 source env/bin/activate
 pip install matplotlib scipy
-
-# without (local) python env
-sudo apt install python3-matplotlib python3-scipy
 ```
 
 ## Worker setup
