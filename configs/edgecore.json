@@ -44,7 +44,7 @@
       "4/0": { "host": "gnode4", "speed": "100", "enable": true, "auto-negotiation": false },
       "5/0": { "host": "gnode5", "speed": "100", "enable": true, "auto-negotiation": false },
       "6/0": { "host": "gnode6", "speed": "100", "enable": true, "auto-negotiation": false }
-    },    
+    },
     "lpbk_ports": {
       "7/0": { "speed": "400", "enable": true }
     },

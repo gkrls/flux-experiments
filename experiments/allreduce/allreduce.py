@@ -39,7 +39,7 @@ def init(args):
     os.environ["WORLD_SIZE"] = str(args.world_size)
 
     init_method = f"tcp://{args.master_addr}:{args.master_port}"
-    
+
     if args.backend.startswith("dpa"):
         if not dpa: raise RuntimeError(f"DPA module not found!")
         if not args.dpa_conf: raise RuntimeError(f"--dpa_conf required for backend {args.backend}")
@@ -75,8 +75,7 @@ def init(args):
         os.environ["GLOO_SOCKET_IFNAME"] = backend['iface']
         dist.init_process_group(backend=args.backend, init_method=init_method, 
                                 rank=args.rank, world_size=args.world_size, pg_options=pg_options)
-        
-      
+
     elif args.backend == "gloo":
         # Handle Gloo with specific network interface
         if args.gloo_socket_ifname:
@@ -117,15 +116,14 @@ def init(args):
             if args.nccl_buffsize: os.environ["NCCL_BUFFSIZE"] = str(args.nccl_buffsize)
             if args.nccl_ib_qps_per_connection: os.environ["NCCL_IB_QPS_PER_CONNECTION"] = str(args.nccl_ib_qps_per_connection)
 
-            
         else:  # Plain "nccl" - use default auto-detection
             print(f"[Rank {args.rank}] Using NCCL with auto-detected transport")
-        
+
         # Additional NCCL tuning options
         if args.nccl_debug: os.environ["NCCL_DEBUG"] = "INFO"
-        
+
         dist.init_process_group(backend=actual_backend, init_method=init_method, rank=args.rank, world_size=args.world_size)
-    
+
     else:
         raise ValueError(f"Unknown backend: {args.backend}")
 
@@ -174,14 +172,13 @@ def results(args, data):
     print(s)
 
 def benchmark(args):
-    
     dist.barrier()
     print(f"[Rank {args.rank}] {args.world_size} ranks ready...")
 
     # Setup device
     device = torch.device(args.device)
     if args.device == "cuda": torch.cuda.set_device(args.rank % torch.cuda.device_count())
-    
+
     # Create ALL tensors upfront
     print(f"[Rank {args.rank}] Creating tensors...")
     tensors = [PATTERN[args.pattern](args) for i in range(args.warmup + args.iters)]
@@ -215,7 +212,7 @@ def benchmark(args):
         batch_i = -1
 
         t_start_all = time.time_ns()
-        
+
         for i in range(args.iters):
             if len(jobs) == 0:
                 batch_i += 1
@@ -234,7 +231,7 @@ def benchmark(args):
                 print("straggling op!!!")
                 args.straggle_num -= 1
                 time.sleep(args.straggle_ms / 1000)
-                
+
             jobs.append(dist.all_reduce(tensors[args.warmup + i], op=op, async_op=True))
 
 
@@ -256,7 +253,7 @@ def benchmark(args):
 
     times_np = np.array(times, dtype=np.float64)
     counts_np = np.array(counts, dtype=np.int32)
-    
+
     # Compute all local metrics
     # time_mean = np.mean(times_np) #* 1000  # ms
     time_mean = np.average(times_np, weights=counts_np)
@@ -266,8 +263,8 @@ def benchmark(args):
     # time_max = np.max(times_np) #* 1000
     # time_p50 = np.percentile(times_np, 50) #* 1000
     # time_p95 = np.percentile(times_np, 95) #* 1000
-    # time_p99 = np.percentile(times_np, 99) #* 1000    
-        
+    # time_p99 = np.percentile(times_np, 99) #* 1000
+
     data = {
         "bytes" : tensor_bytes,
         "times" : times_np.tolist(),
@@ -299,7 +296,7 @@ def benchmark(args):
             diff = (out - expected).abs()
             max_err = diff.max().item()
             ok = (max_err <= tol) if out.is_floating_point() else (max_err == 0)
-            
+
             if not ok and local_first_failure == None:
                 bad = (diff > tol).nonzero(as_tuple=False).flatten()
                 idx = bad[:min(10, len(bad))].tolist()  # Show up to 10 errors
@@ -337,25 +334,12 @@ def benchmark(args):
             # if dist_ok: print("✅ Global Verification PASSED")
             # else: print("❌ Global Verification FAILED at ranks: ", ok_tensor.item())
 
-
-        # ok_tensor = torch.tensor(1 if local_ok else 0, device=device, dtype=torch.int32)
-        # dist.all_reduce(ok_tensor, op=dist.ReduceOp.MIN)
-        # if ok_tensor.item() == 1:
-        #     if args.rank == 0: 
-        #         print("✅ Verification PASSED (simple SUM).")
-        # else:
-        #     if first_failure: 
-        #         print(first_failure)
-        #     if args.rank == 0: 
-        #         print("❌ Verification FAILED (simple SUM). See rank logs above.")
-
     results(args, data)
-    
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AllReduce Benchmark")
-    
+
     # Core arguments
     parser.add_argument("-b", "--backend", required=True, choices=["gloo", "nccl", "nccl_rdma", "nccl_tcp", "dpa_sock", "dpa_dpdk"], help="Communication backend to use")
     parser.add_argument("-d", "--device", default="cpu", choices=["cpu", "cuda"], help="Device to run on")
@@ -370,16 +354,16 @@ if __name__ == "__main__":
     parser.add_argument("--avg", action="store_true", help="perform averaging")
     parser.add_argument("--verify", nargs="?", const=1, type=int, choices=[0,1,2], default=0, help="Verify output. 0=no verification 1=local only, 2=local + global (default=0)")
     parser.add_argument("--json", type=str, default="allreduce-benchmark.json")
-    
+
     # Statistics aggregation
     parser.add_argument("--global_stats", action="store_true", help="Also compute and report global statistics across all ranks")
-    
+
     # Distributed arguments
     parser.add_argument("--rank", type=int, default=int(os.environ.get("RANK", 0)), help="Rank of this process")
     parser.add_argument("--world_size", type=int, default=int(os.environ.get("WORLD_SIZE", 1)), help="Total number of processes")
     parser.add_argument("--master_addr", default=os.environ.get("MASTER_ADDR", "127.0.0.1"), help="Master node address")
     parser.add_argument("--master_port", type=int, default=int(os.environ.get("MASTER_PORT", 29500)), help="Master node port")
-    
+
     # NCCL specific arguments
     parser.add_argument("--nccl_socket_ifname", help="Network interface for NCCL TCP/socket operations (e.g., ens4f1, eth0)")
     parser.add_argument("--nccl_ib_hca", default=None, help="RDMA HCA device for NCCL RDMA mode (e.g., mlx5_0, mlx5_1)")
@@ -389,11 +373,11 @@ if __name__ == "__main__":
     parser.add_argument("--nccl_socket_nthreads", type=int, default=None)
     parser.add_argument("--nccl_max_channels", type=int, default=None)
     parser.add_argument("--nccl_buffsize", type=int, default=None)
-    
+
     # Gloo specific arguments
     parser.add_argument("--gloo_socket_ifname", help="Network interface for Gloo backend (e.g., ens4f1, eth0)")
     parser.add_argument("--gloo_num_threads", type=int, default=None)
-    
+
     # DPA specific arguments
     parser.add_argument("--dpa_conf", help="DPA config file")
     parser.add_argument("--dpa_threads", type=int, default=None, help="Number of DPA threads")
@@ -415,7 +399,7 @@ if __name__ == "__main__":
     parser.add_argument("--straggle_start", type=int, default=0, help="Batch/Op id to start straggling")
     parser.add_argument("--straggle_rank", type=int, default=None, help="Rank to straggle")
     parser.add_argument("--straggle_mode", choices=["op", "batch"], default="batch", help="Apply straggle sim per batch or per op")
-    
+
     args = parser.parse_args()
     args.date = datetime.now().strftime("%B %d, %Y at %I:%M:%S %p")
     # args.json = args.json if args.json is not None else os.path.join(os.path.dirname(__file__), "allreduce-benchmark.json")
@@ -427,7 +411,7 @@ if __name__ == "__main__":
     if args.dpa_pre and not args.avg: raise RuntimeError("--dpa_pre only available with --avg")
     if args.device == "cuda" and not torch.cuda.is_available():  raise RuntimeError("CUDA not available")
     if args.verify and args.dpa_k not in [0, args.world_size]: raise RuntimeError(f"Cannot reliably verify results with straggle awareness enabled")
-    
+
     init(args)
     benchmark(args)
 
