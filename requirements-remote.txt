@@ -5,6 +5,7 @@ torchvision==0.22.1
 
 # Back to PyPI for everything else
 --index-url https://pypi.org/simple/
+scipy
 # Core HF stack for GPT-2 training
 transformers>=4.44,<5
 tokenizers>=0.19
