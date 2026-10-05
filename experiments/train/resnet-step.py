@@ -237,6 +237,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
 
         step_start = time.perf_counter()
 
+        # stop if max_steps > 0 and reached
+        if args.max_steps and step_idx >= args.max_steps: break
+
     if device.type == 'cuda':
         epoch_end.record()
         epoch_end.synchronize()
@@ -250,6 +253,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
         'loss': losses.avg,
         'top1': top1.avg,
         'top5': top5.avg,
+        'steps': step_idx,
         'step_time_min': step_time.min,
         'step_time_max': step_time.max,
         'step_time': step_time.avg,
@@ -327,10 +331,13 @@ def train(args,straggle):
         # Train for one epoch and get metrics
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, epoch, args)
 
-        global_step += len(train_loader)
+        global_step += train_metrics['steps']
+        stop = bool(args.max_steps and global_step >= args.max_steps)
 
         # Validate and get metrics
-        val_metrics = validate(model, val_loader, device, args)
+        # val_metrics = validate(model, val_loader, device, args)
+        if stop: val_metrics = {'loss': float('nan'), 'top1': float('nan'), 'top5': float('nan')}
+        else:    val_metrics = validate(model, val_loader, device, args)
 
         # Epoch wall time
         epoch_time = time.time() - epoch_wall_start
@@ -359,7 +366,7 @@ def train(args,straggle):
             "val_top1": float(val_metrics['top1']),
             "val_top5": float(val_metrics['top5']),
             "lr": float(current_lr),
-            "steps": int(len(train_loader)),
+            "steps": int(train_metrics['steps']),
             "global_step": int(global_step),
             "step_time": float(train_metrics['step_time']),
             "step_time_min": float(train_metrics['step_time_min']),
@@ -377,13 +384,16 @@ def train(args,straggle):
         save_log(args.json, log)
 
         # Track best validation accuracy (not printed, but could be used later)
-        if val_metrics['top1'] > best_top1:
-            best_top1 = val_metrics['top1']
-        if val_metrics['top5'] > best_top5:
-            best_top5 = val_metrics['top5']
+        best_top1 = max(best_top1, val_metrics['top1'])
+        best_top5 = max(best_top5, val_metrics['top5'])
+        # if val_metrics['top1'] > best_top1:
+        #     best_top1 = val_metrics['top1']
+        # if val_metrics['top5'] > best_top5:
+        #     best_top5 = val_metrics['top5']
 
         # Step the scheduler after evaluation (end of epoch)
         scheduler.step()
+        if stop: break
 
 
 # ------------------------- Entry / Setup ------------------------
@@ -504,7 +514,7 @@ def main():
     parser.add_argument('--prescale', action="store_true", help="Prescale gradients for allreduce")
     parser.add_argument("--bucket_cap_mb", type=int, default=None, help="DDP bucket capacity")
     parser.add_argument("--log_every_steps", type=int, default=0, help="Print step stats every N steps (0=off)")
-
+    parser.add_argument("--max_steps", type=int, default=0)
 
     # Straggle
     def csv_ints(s: str) -> list[int]:
