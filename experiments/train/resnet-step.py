@@ -286,12 +286,12 @@ def train(args,straggle):
     if args.backend.startswith("dpa"):
         model = dpa.DDPWrapper(model, sa_world = args.dpa_k if args.dpa_k else args.world_size, sa_preemptive=args.dpa_preemptive,
                                prescale=args.dpa_prescale)
-        
+
     print(f"Model '{args.model}' initialized.", flush=True)
 
     # Straggle sim
     # straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, ranks=args.straggle_ranks,
-    #                               multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)      
+    #                               multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)
     # if straggle.attach(model): print(f"Straggle sim initialized with {straggle}")
     # else: print(f"Straggle sim inactive")
     # straggle_sim = SlowWorkerPattern(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
@@ -438,7 +438,7 @@ def setup_ddp(args):
         pg_options.hint_pinned_tensor_pool_size = 20                                                                                       # observed count 13
         dist.init_process_group(backend=args.backend, init_method=init_method, rank=args.rank, world_size=args.world_size,
                                 timeout = datetime.timedelta(seconds=60), pg_options=pg_options)
-   
+
         if args.dpa_repin:
             os.sched_setaffinity(0, set(range(os.cpu_count() - dpa_backend.threads - 1)))
             print(f"[{now()}] re-pinned to cores 0-{os.cpu_count() - dpa_backend.threads - 1}")
@@ -447,7 +447,7 @@ def setup_ddp(args):
 
     print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
-    
+
     # Start the process group
     # dist.init_process_group(
     #     backend=args.backend,
@@ -570,11 +570,12 @@ def main():
 
     straggle = None
     if args.straggle_points:
-        straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, 
+        straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
                                       ranks=args.straggle_ranks, skip=args.straggle_skip,skip_every=args.straggle_skip_every,
-                                      last=args.straggle_last, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)
+                                      last=args.straggle_last, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose,
+                                      seed=args.seed)
         straggle.print_pattern()
-    
+
     train(args, straggle)
 
 if __name__ == '__main__':

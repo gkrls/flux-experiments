@@ -27,13 +27,13 @@ def save_log(path, log):
 
 class AverageMeter:
     def __init__(self): self.reset()
-    def reset(self): 
-        self.sum = 0.0; 
-        self.count = 0.0; 
+    def reset(self):
+        self.sum = 0.0;
+        self.count = 0.0;
         self.avg = 0.0
         # self.min = 0.0
         # self.max = 0.0
-    def update(self, val, n=1): 
+    def update(self, val, n=1):
         self.sum += float(val)*n
         self.count += n
         self.avg = self.sum / max(1.0, self.count)
@@ -205,7 +205,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
             if scaler is not None: scaler.scale(loss).backward()
             else: loss.backward()
         _sync()
-        t2 = time.perf_counter() 
+        t2 = time.perf_counter()
         micro_dt = t2 - t0
 
         # micro accounting
@@ -266,7 +266,7 @@ def train_one_epoch(model, dataloader, optimizer, device, scaler, args,
                       f"train_loss={train_loss:.4f} train_ppl={train_ppl:.2f} lr={lr:.6f} "
                       f"step_time={step_time_win:.3f}s step_time_min={step_time_min:.3f} step_time_max={step_time_max:.3f} "
                       f"micro_time={micro_time_win:.3f}s tp={tok_per_s:.0f} tok/s",flush=True)
-                
+
                 if log is not None:
                     ep = log.setdefault("updates", {}).setdefault(str(epoch), {})
                     ep[f"{step_count:04d}"] = {
@@ -395,7 +395,7 @@ def train(args, straggle, best_model_group):
         if not p.requires_grad: continue
         (decay_params if p.ndim >= 2 else nodecay_params).append(p)
 
-    optimizer = AdamW([{"params": decay_params, "weight_decay": args.weight_decay}, {"params": nodecay_params, "weight_decay": 0.0}], 
+    optimizer = AdamW([{"params": decay_params, "weight_decay": args.weight_decay}, {"params": nodecay_params, "weight_decay": 0.0}],
                       lr=args.learning_rate, betas=(0.9, 0.95), eps=1e-8)
     scaler = torch.amp.GradScaler('cuda', enabled=(device.type == "cuda" and args.amp))
 
@@ -467,11 +467,11 @@ def train(args, straggle, best_model_group):
     dist.barrier() # make sure all ranks start together
     for epoch in range(args.epochs):
         print(f"[{now()}][Epoch {epoch:03d}] ...")
-        
+
         epoch_start = time.time()
 
         if straggle is not None: straggle.reset_stats()
-        
+
         train_ds.set_epoch(epoch)
 
         # train
@@ -545,10 +545,10 @@ def train(args, straggle, best_model_group):
         pairs = [f"{rank}:{ppl.item():.4f}" for rank, ppl in zip(args.best_model_active_ranks, all_ppls)]
         print(f"[{now()}] All val_ppls: {', '.join(pairs)}")
         print(f"[{now()}] Best val_ppl: {float(all_ppls[best_idx]):.4f} at rank {best_rank}", flush=True)
-        
 
 
-    
+
+
 
 
 # ------------------------- DDP setup/teardown -------------------------
@@ -594,7 +594,7 @@ def setup_ddp(args):
 
     print(f"[{now()}] DDP setup with backend={args.backend} world_size={args.world_size} "
           f"master={args.master_addr}:{args.master_port} iface={args.iface} local_rank={args.local_rank}", flush=True)
-    
+
     args.best_model_group        = None
     args.best_model_active_ranks = None
     if args.best_model:
@@ -673,7 +673,7 @@ def main():
 
     parser.add_argument('--best_model', action='store_true', help='Select model with best val loss among participating ranks')
     parser.add_argument('--best_model_ignore', type=csv_ints, default=[], help='Ranks to exclude from --best_model comparison.')
-    
+
     # args = parser.parse_args()
     args, unknown = parser.parse_known_args()
     if unknown: print(f"[{now()}][Warning] Ignoring unknown args: {unknown}", flush=True)
@@ -721,11 +721,12 @@ def main():
 
     straggle = None
     if args.straggle_points:
-        straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount, 
+        straggle = dpa.DDPStraggleSim(points=args.straggle_points, prob=args.straggle_prob, amount=args.straggle_amount,
                                       ranks=args.straggle_ranks, skip=args.straggle_skip,skip_every=args.straggle_skip_every,
-                                      last=args.straggle_last, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose)
+                                      last=args.straggle_last, multiplier_range=args.straggle_multiply, verbose=args.straggle_verbose,
+                                      seed=args.seed)
         straggle.print_pattern()
-    
+
     train(args,straggle,best_model_group)
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ def format_alpaca(example):
         return ALPACA_PROMPT_WITH_INPUT.format(**example)
     else:
         return ALPACA_PROMPT_NO_INPUT.format(**example)
-    
+
 METAMATH_PROMPT = (
     "Below is an instruction that describes a task. "
     "Write a response that appropriately completes the request.\n\n"
@@ -102,7 +102,7 @@ class SFTDataset(Dataset):
         skipped = 0
         for ex in examples:
             text = formatter(ex)
-            
+
             # 1. Determine exactly how long the prompt is in tokens to mask it
             mask_len = 0
             if self.mask_prompt:
@@ -116,11 +116,11 @@ class SFTDataset(Dataset):
             ids = tokenizer.encode(text, add_special_tokens=True)
             if tokenizer.eos_token_id is not None and (len(ids) == 0 or ids[-1] != tokenizer.eos_token_id):
                 ids.append(tokenizer.eos_token_id)
-            
+
             if len(ids) < 4:
                 skipped += 1
                 continue
-                
+
             # truncate to max_seq_len + 1
             ids = ids[:max_seq_len + 1]
             self.data.append((ids, mask_len)) # Store mask_len alongside ids
@@ -133,7 +133,7 @@ class SFTDataset(Dataset):
 
     def __getitem__(self, idx):
         ids, mask_len = self.data[idx]
-        
+
         # pad to max_seq_len + 1
         pad_len = (self.max_seq_len + 1) - len(ids)
         attention_len = len(ids)
@@ -501,7 +501,7 @@ def train(args, straggle, best_model_group):
         val_examples   = raw["validation"]
 
     print(f"[{now()}] Tokenizing {len(train_examples)} train + {len(val_examples)} val examples (max_seq_len={args.seq_len})")
-    
+
     if "metamath" in args.dataset.lower():
         formatter, response_marker = format_metamath, "\n### Response: Let's think step by step.\n"
     else:
@@ -533,7 +533,7 @@ def train(args, straggle, best_model_group):
               f"{truncated} truncated ({100*truncated/total:.1f}%), "
               f"{empty_response} with <=1 response token ({100*empty_response/total:.1f}%), "
               f"response token lengths p50={p50} p90={p90} p99={p99}")
-    
+
     # ---- samplers + loaders ----
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_ds, num_replicas=args.world_size, rank=args.rank, shuffle=True, drop_last=True)
@@ -568,7 +568,7 @@ def train(args, straggle, best_model_group):
         force_download=args.force_download,
         torch_dtype=torch.float32,
     ).to(device)
-    model.config.use_cache = False  
+    model.config.use_cache = False
     model.gradient_checkpointing_enable()
     # This prevents gradient checkpointing from breaking autograd
     if hasattr(model, "enable_input_require_grads"):
@@ -957,7 +957,7 @@ def main():
             amount=args.straggle_amount, ranks=args.straggle_ranks,
             skip=args.straggle_skip, skip_every=args.straggle_skip_every,
             last=args.straggle_last, multiplier_range=args.straggle_multiply,
-            verbose=args.straggle_verbose)
+            verbose=args.straggle_verbose, seed=args.seed)
         straggle.print_pattern()
     elif args.straggle_points and dpa is None:
         print(f"[{now()}][Warning] --straggle_points={args.straggle_points} but dpa module not available. Skipping.", flush=True)

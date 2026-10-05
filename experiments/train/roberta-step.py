@@ -847,7 +847,7 @@ def main():
             amount=args.straggle_amount, ranks=args.straggle_ranks,
             skip=args.straggle_skip, skip_every=args.straggle_skip_every,
             last=args.straggle_last, multiplier_range=args.straggle_multiply,
-            verbose=args.straggle_verbose)
+            verbose=args.straggle_verbose, seed=args.seed)
         straggle.print_pattern()
     elif args.straggle_points and dpa is None:
         print(f"[{now()}][Warning] --straggle_points={args.straggle_points} but dpa module not available. Skipping.", flush=True)
