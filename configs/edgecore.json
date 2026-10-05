@@ -70,7 +70,7 @@
     "async": true,
     "drain_queues": true,
     "timeout_us": 5000,
-    "timeout_init_scaling": 5.1,
+    "timeout_init_scaling": 25.5,
     "threads": 6,
     "window":  64,
     "tx_burst": 64,
