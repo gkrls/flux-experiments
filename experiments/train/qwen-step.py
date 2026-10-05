@@ -407,6 +407,8 @@ def train_one_epoch(model, dataloader, optimizer, sched, device, scaler, args,
                 w_fwd_time = 0.0; w_bwd_time = 0.0
                 w_tokens = 0; w_loss_sum = 0.0; w_token_count = 0
 
+            if args.max_steps and global_step >= args.max_steps: break
+
             # ----- mini validation -----
             steps_remaining = steps_per_epoch - step_count
             do_mini_val = False
@@ -695,6 +697,10 @@ def train(args, straggle, best_model_group):
         train_metrics = train_one_epoch(model, train_loader, optimizer, sched, device, scaler, args,
                                         epoch, global_step, val_loader=val_loader, log=log)
         global_step += train_metrics["steps"]
+        stop = bool(args.max_steps and global_step >= args.max_steps)
+        # validate full
+        if stop: val_metrics = {"loss": float("nan"), "ppl": float("nan")}
+        else:    val_metrics = validate(model, val_loader, device, args, max_batches=args.val_max_batches)
 
         # validate full
         val_metrics = validate(model, val_loader, device, args, max_batches=args.val_max_batches)
@@ -747,8 +753,10 @@ def train(args, straggle, best_model_group):
         log["epochs"][str(epoch)] = epoch_metrics
         save_log(args.json, log)
 
-        if val_metrics["ppl"] < best_ppl:
-            best_ppl = val_metrics["ppl"]
+        best_ppl = min(val_metrics["ppl"], best_ppl)
+        # if val_metrics["ppl"] < best_ppl:
+        #     best_ppl = val_metrics["ppl"]
+        if stop: break
 
     print(f"\n[{now()}] Training complete. Best (local) validation perplexity: {best_ppl:.2f}")
 
@@ -841,6 +849,7 @@ def main():
     parser.add_argument("--json", type=str, default="qwen_alpaca.json", help="Path to JSON run log")
     parser.add_argument("--log_every_opt_steps", type=int, default=0, help="Log every N optimizer updates during training. 0=disabled.")
     parser.add_argument("--log_flush_on_minival", action="store_true", help="Write JSON log to disk after every mini-val and periodic log")
+    parser.add_argument("--max_steps", type=int, default=0)
 
 
     parser.add_argument("--dpa_conf", type=str, default=None, help="Path to dpa config.json")
